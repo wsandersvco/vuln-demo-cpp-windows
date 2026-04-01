@@ -10,6 +10,114 @@
 #include <fstream>
 #include <cstring>
 #include <ctime>
+#include <sstream>
+#include <stdexcept>
+
+// Simulated sensitive data
+const char* DATABASE_PASSWORD = "MyS3cr3tP@ssw0rd!";
+const char* API_KEY = "sk_live_1234567890abcdefghijklmnop";
+const char* DATABASE_CONNECTION = "Server=prod-db.internal.corp;User=admin;Password=MyS3cr3tP@ssw0rd!;";
+const char* SSH_PRIVATE_KEY = "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA1234567890...\n-----END RSA PRIVATE KEY-----";
+
+// CWE-209: Error message containing sensitive information
+void authenticate_user(const char* username, const char* password) {
+    // VULNERABLE: Exposes database password in exception message
+    if (std::string(password) != "correct_password") {
+        std::string error = "Authentication failed for user: " + std::string(username) + 
+                          ". Database connection: " + DATABASE_CONNECTION + 
+                          " returned error code 401";
+        throw std::runtime_error(error);
+    }
+}
+
+// CWE-200: Information Exposure - exposing system paths and configurations
+void print_system_info() {
+    std::cout << "\n=== SYSTEM INFORMATION ===\n";
+    // VULNERABLE: Exposing internal system paths
+    std::cout << "Database Host: prod-db.internal.corp\n";
+    std::cout << "Database Port: 5432\n";
+    std::cout << "Config Path: /etc/app/config/production.xml\n";
+    std::cout << "Private Key Path: /home/admin/.ssh/id_rsa\n";
+    std::cout << "Admin Username: root_admin\n";
+    std::cout << "Internal API Endpoint: https://internal-api.corp.local:8443/admin\n";
+}
+
+// CWE-201: Insertion of Sensitive Information Into Sent Data
+std::string generate_http_response(const char* username) {
+    std::stringstream response;
+    response << "HTTP/1.1 200 OK\n";
+    response << "Content-Type: application/json\n";
+    response << "X-Internal-User: " << username << "\n";
+    // VULNERABLE: Including sensitive data in HTTP headers
+    response << "X-Database-Password: " << DATABASE_PASSWORD << "\n";
+    response << "X-API-Key: " << API_KEY << "\n";
+    response << "X-Session-Token: sessiontoken_" << username << "_" << DATABASE_PASSWORD << "\n";
+    response << "\n";
+    response << "{\"user\":\"" << username << "\",\"api_key\":\"" << API_KEY << "\"}\n";
+    return response.str();
+}
+
+// CWE-215: Insertion of Sensitive Information Into Debugging Code
+void debug_login_attempt(const char* username, const char* password, bool success) {
+    #ifdef _DEBUG
+    // VULNERABLE: Debug output containing passwords
+    std::cout << "[DEBUG] Login attempt:\n";
+    std::cout << "  Username: " << username << "\n";
+    std::cout << "  Password: " << password << "\n";
+    std::cout << "  Success: " << (success ? "true" : "false") << "\n";
+    std::cout << "  Database Password: " << DATABASE_PASSWORD << "\n";
+    std::cout << "  API Key: " << API_KEY << "\n";
+    #endif
+    
+    // VULNERABLE: Writing sensitive data to debug log file
+    std::ofstream debuglog("debug.log", std::ios::app);
+    if (debuglog.is_open()) {
+        debuglog << "[DEBUG] Credentials used - User: " << username 
+                 << " | Pass: " << password 
+                 << " | DB_PASS: " << DATABASE_PASSWORD << "\n";
+        debuglog.close();
+    }
+}
+
+// CWE-209: Detailed exception with internal information
+void connect_to_database() {
+    // VULNERABLE: Exception exposes connection string with credentials
+    try {
+        bool connection_failed = true;
+        if (connection_failed) {
+            std::stringstream error;
+            error << "Database connection failed!\n";
+            error << "Connection string: " << DATABASE_CONNECTION << "\n";
+            error << "Host: prod-db.internal.corp\n";
+            error << "Username: admin\n";
+            error << "Password: " << DATABASE_PASSWORD << "\n";
+            error << "Stack trace: connect_to_database() at main.cpp:89\n";
+            throw std::runtime_error(error.str());
+        }
+    } catch (const std::exception& e) {
+        // VULNERABLE: Re-throwing with even more sensitive info
+        std::cerr << "CRITICAL ERROR: " << e.what() << "\n";
+        std::cerr << "API Key for recovery: " << API_KEY << "\n";
+        std::cerr << "SSH Key: " << SSH_PRIVATE_KEY << "\n";
+    }
+}
+
+// CWE-200: Information disclosure through verbose error messages
+void process_payment(const char* credit_card, const char* cvv) {
+    std::cout << "\n=== Processing Payment ===\n";
+    // VULNERABLE: Displaying full credit card details
+    std::cout << "Credit Card: " << credit_card << "\n";
+    std::cout << "CVV: " << cvv << "\n";
+    std::cout << "Processing with API Key: " << API_KEY << "\n";
+    
+    // VULNERABLE: Logging sensitive financial data
+    std::ofstream paymentlog("payments.log", std::ios::app);
+    if (paymentlog.is_open()) {
+        paymentlog << "CC: " << credit_card << " | CVV: " << cvv 
+                   << " | API: " << API_KEY << "\n";
+        paymentlog.close();
+    }
+}
 
 // CWE-117: Vulnerable logging function that doesn't sanitize input
 void log_user_action(const char* username, const char* action) {
@@ -86,16 +194,54 @@ void matrix_multiply(const std::vector<std::vector<double>>& a,
 }
 
 int main() {
+    std::cout << "ARM64 Sample Project - Security Scanner Test\n";
+    std::cout << "==============================================\n\n";
+    
     // CWE-117: Simulate user input that could contain log injection
     char username[256];
+    char password[256];
     std::cout << "Enter username: ";
     std::cin.getline(username, 256);
+    std::cout << "Enter password: ";
+    std::cin.getline(password, 256);
+    
+    // CWE-215: Debug output with sensitive information
+    debug_login_attempt(username, password, false);
     
     // VULNERABLE: Log user action without sanitization
     log_user_action(username, "Application started");
     
+    // CWE-200: Exposing system information
+    print_system_info();
+    
+    // CWE-201: Generating HTTP response with sensitive data
+    std::cout << "\n=== GENERATING HTTP RESPONSE ===\n";
+    std::string http_response = generate_http_response(username);
+    std::cout << http_response << "\n";
+    
+    // CWE-209: Exception with sensitive information
+    std::cout << "\n=== ATTEMPTING DATABASE CONNECTION ===\n";
+    try {
+        connect_to_database();
+    } catch (const std::exception& e) {
+        // Error already printed in connect_to_database()
+    }
+    
+    // CWE-209: Authentication error with sensitive details
+    std::cout << "\n=== TESTING AUTHENTICATION ===\n";
+    try {
+        authenticate_user(username, password);
+    } catch (const std::exception& e) {
+        std::cerr << "Authentication Error: " << e.what() << "\n";
+    }
+    
+    // CWE-200: Processing payment with exposed data
+    process_payment("4532-1234-5678-9010", "123");
+    
     // VULNERABLE: Simulate authentication attempt with user input
     log_authentication_attempt(username, true);
+    
+    std::cout << "\n=== COMPUTATION TESTS ===\n";
     
     // Test factorial computation
     std::cout << "Computing factorials:\n";
