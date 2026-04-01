@@ -397,6 +397,80 @@ int main() {
     
     std::cout << "\n=== END BUFFER OVERFLOW VULNERABILITIES ===\n\n";
     
+    // ========================================================================
+    // LOGIC ERROR VULNERABILITIES
+    // ========================================================================
+    
+    std::cout << "\n=== LOGIC ERROR VULNERABILITIES ===\n";
+    std::cout << "Testing logic error vulnerabilities...\n\n";
+    
+    // CWE-606: Unchecked loop condition
+    std::cout << "--- CWE-606: Unchecked Loop Condition ---\n";
+    int loop_count;
+    std::cout << "Enter loop count: ";
+    std::cin >> loop_count;
+    std::cin.ignore();  // Clear newline
+    LogicErrorVulns::unchecked_loop_condition(loop_count);
+    
+    // CWE-467: sizeof on pointer
+    std::cout << "\n--- CWE-467: sizeof() on Pointer ---\n";
+    char sizeof_test[100];
+    std::cout << "Enter string for sizeof test: ";
+    std::cin.getline(sizeof_test, 100);
+    LogicErrorVulns::sizeof_on_pointer(sizeof_test);
+    
+    // CWE-482: Compare instead of assign
+    std::cout << "\n--- CWE-482: Comparing instead of Assigning ---\n";
+    int compare_value = 15;
+    LogicErrorVulns::compare_instead_of_assign(compare_value);
+    
+    // CWE-571: Always true expression
+    std::cout << "\n--- CWE-571: Expression Always True ---\n";
+    unsigned int unsigned_value = 10;
+    LogicErrorVulns::always_true_expression(unsigned_value);
+    
+    // CWE-783: Operator precedence error
+    std::cout << "\n--- CWE-783: Operator Precedence Error ---\n";
+    int flags = 7;  // Binary: 111
+    LogicErrorVulns::operator_precedence_error(flags);
+    
+    std::cout << "\n=== END LOGIC ERROR VULNERABILITIES ===\n\n";
+    
+    // ========================================================================
+    // DANGEROUS FUNCTION VULNERABILITIES
+    // ========================================================================
+    
+    std::cout << "\n=== DANGEROUS FUNCTION VULNERABILITIES ===\n";
+    std::cout << "Testing dangerous function vulnerabilities...\n\n";
+    
+    // CWE-242: Dangerous functions
+    std::cout << "--- CWE-242: Inherently Dangerous Functions ---\n";
+    DangerousFunctionVulns::use_dangerous_functions();
+    
+    // CWE-242: Dangerous signal handling
+    std::cout << "\n--- CWE-242: Dangerous Signal Handler ---\n";
+    DangerousFunctionVulns::dangerous_signal_handler();
+    
+    std::cout << "\n=== END DANGEROUS FUNCTION VULNERABILITIES ===\n\n";
+    
+    // ========================================================================
+    // DEAD CODE VULNERABILITIES
+    // ========================================================================
+    
+    std::cout << "\n=== DEAD CODE VULNERABILITIES ===\n";
+    std::cout << "Testing dead code vulnerabilities...\n\n";
+    
+    // CWE-561: Unreachable code
+    std::cout << "--- CWE-561: Unreachable Code ---\n";
+    DeadCodeVulns::unreachable_code_example();
+    
+    // CWE-561: Code after return
+    std::cout << "\n--- CWE-561: Code After Return ---\n";
+    int dead_result = DeadCodeVulns::code_after_return();
+    std::cout << "[DEBUG] Result from dead code function: " << dead_result << "\n";
+    
+    std::cout << "\n=== END DEAD CODE VULNERABILITIES ===\n\n";
+    
     // VULNERABLE: Log completion with user data
     log_user_action(username, "Application completed successfully");
     

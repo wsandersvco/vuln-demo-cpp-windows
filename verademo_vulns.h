@@ -104,6 +104,143 @@ public:
     static void incorrect_buffer_length(const char* src, int wrong_length);
 };
 
+// CWE-190/CWE-191/CWE-680: Integer Overflow vulnerabilities
+class IntegerVulns {
+public:
+    // CWE-190: Integer Overflow or Wraparound
+    static int integer_overflow_add(int a, int b);
+    
+    // CWE-191: Integer Underflow
+    static unsigned int integer_underflow(unsigned int a, unsigned int b);
+    
+    // CWE-680: Integer Overflow to Buffer Overflow
+    static void integer_to_buffer_overflow(int size);
+    
+    // CWE-194: Unexpected Sign Extension
+    static void sign_extension_error(short value);
+    
+    // CWE-195: Signed to Unsigned Conversion Error
+    static void signed_to_unsigned_error(int signed_value);
+};
+
+// CWE-415/CWE-416/CWE-401: Memory Management vulnerabilities
+class MemoryVulns {
+public:
+    // CWE-415: Double Free
+    static void double_free_vulnerability(char* ptr);
+    
+    // CWE-416: Use After Free
+    static void use_after_free_vulnerability();
+    
+    // CWE-401: Missing Release of Memory after Effective Lifetime (Memory Leak)
+    static void memory_leak();
+    
+    // CWE-404: Improper Resource Shutdown or Release
+    static void resource_leak();
+    
+    // CWE-789: Uncontrolled Memory Allocation
+    static void uncontrolled_memory_allocation(int user_size);
+};
+
+// CWE-476/CWE-690: Null Pointer Dereference vulnerabilities
+class NullPointerVulns {
+public:
+    // CWE-476: NULL Pointer Dereference
+    static void null_pointer_dereference(char* ptr);
+    
+    // CWE-690: Unchecked Return Value to NULL Pointer Dereference
+    static void unchecked_return_value();
+};
+
+// CWE-362/CWE-367: Race Condition vulnerabilities
+class RaceConditionVulns {
+public:
+    // CWE-362: Concurrent Execution using Shared Resource (Race Condition)
+    static void race_condition_file();
+    
+    // CWE-367: Time-of-check Time-of-use (TOCTOU) Race Condition
+    static void toctou_vulnerability(const char* filename);
+};
+
+// CWE-457/CWE-665: Uninitialized Variable vulnerabilities
+class UninitializedVulns {
+public:
+    // CWE-457: Use of Uninitialized Variable
+    static int use_uninitialized_variable();
+    
+    // CWE-665: Improper Initialization
+    static void improper_initialization();
+};
+
+// CWE-704/CWE-843: Type Confusion vulnerabilities
+class TypeVulns {
+public:
+    // CWE-704: Incorrect Type Conversion or Cast
+    static void incorrect_type_cast();
+    
+    // CWE-843: Access of Resource Using Incompatible Type
+    static void type_confusion();
+};
+
+// CWE-325/CWE-330: Cryptography vulnerabilities
+class CryptoVulns {
+public:
+    // CWE-325: Missing Required Cryptographic Step
+    static void missing_crypto_step(const char* password);
+    
+    // CWE-330: Use of Insufficiently Random Values
+    static int weak_random_number();
+};
+
+// CWE-732/CWE-276: Permission/Privilege vulnerabilities
+class PermissionVulns {
+public:
+    // CWE-732: Incorrect Permission Assignment for Critical Resource
+    static void insecure_file_permissions(const char* filename);
+    
+    // CWE-250: Execution with Unnecessary Privileges
+    static void unnecessary_privileges();
+};
+
+// CWE-606/467/482/571/783: Logic Error vulnerabilities
+class LogicErrorVulns {
+public:
+    // CWE-606: Unchecked Input for Loop Condition
+    static void unchecked_loop_condition(int user_count);
+    
+    // CWE-467: Use of sizeof() on a Pointer Type
+    static void sizeof_on_pointer(const char* str);
+    
+    // CWE-482: Comparing instead of Assigning
+    static void compare_instead_of_assign(int value);
+    
+    // CWE-571: Expression is Always True
+    static void always_true_expression(unsigned int value);
+    
+    // CWE-783: Operator Precedence Logic Error
+    static int operator_precedence_error(int flags);
+};
+
+// CWE-242: Use of Inherently Dangerous Function
+class DangerousFunctionVulns {
+public:
+    // CWE-242: Dangerous functions (tmpnam, mktemp, getpass)
+    static void use_dangerous_functions();
+    
+    // CWE-242: Dangerous signal handling
+    static void dangerous_signal_handler();
+};
+
+// CWE-561: Dead Code
+class DeadCodeVulns {
+public:
+    // CWE-561: Dead Code that is never executed
+    static void unreachable_code_example();
+    
+    // CWE-561: Dead code after return
+    static int code_after_return();
+};
+
 // Helper function to simulate SQL execution
 std::string execute_sql_query(const std::string& query);
 
