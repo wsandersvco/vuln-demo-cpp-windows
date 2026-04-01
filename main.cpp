@@ -224,7 +224,7 @@ int main() {
     std::cout << "\n=== ATTEMPTING DATABASE CONNECTION ===\n";
     try {
         connect_to_database();
-    } catch (const std::exception& e) {
+    } catch (const std::exception&) {
         // Error already printed in connect_to_database()
     }
     

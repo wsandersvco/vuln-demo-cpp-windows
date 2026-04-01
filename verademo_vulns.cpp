@@ -7,9 +7,23 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
-#include <unistd.h>
-#include <sys/stat.h>
 #include <csignal>
+
+// Platform-specific includes
+#ifdef _WIN32
+    #include <io.h>
+    #include <direct.h>
+    #include <sys/stat.h>
+    #define popen _popen
+    #define pclose _pclose
+    #define access _access
+    #define F_OK 0
+    #define getcwd _getcwd
+    #define chmod _chmod
+#else
+    #include <unistd.h>
+    #include <sys/stat.h>
+#endif
 
 // Simple MD5 stub
 namespace SimpleMD5 {
@@ -511,7 +525,11 @@ void PermissionVulns::insecure_file_permissions(const char* filename) {
         fprintf(file, "sensitive data");
         fclose(file);
     }
-    chmod(filename, 0777);  // VULNERABLE: World-readable/writable
+    #ifdef _WIN32
+    chmod(filename, _S_IREAD | _S_IWRITE);  // VULNERABLE: Windows permissions
+    #else
+    chmod(filename, 0777);  // VULNERABLE: World-readable/writable (Unix)
+    #endif
     /* END VULNERABILITY */
 }
 
@@ -617,17 +635,27 @@ void DangerousFunctionVulns::use_dangerous_functions() {
     tmpnam(temp_file);
     std::cout << "[DEBUG] Temp file: " << temp_file << "\n";
     
-    // VULNERABLE: mktemp is deprecated and unsafe
+    #ifndef _WIN32
+    // VULNERABLE: mktemp is deprecated and unsafe (Unix only)
     char template_name[] = "/tmp/fileXXXXXX";
-    mktemp(template_name);
-    std::cout << "[DEBUG] Template: " << template_name << "\n";
-    
-    // VULNERABLE: getwd is deprecated (buffer overflow risk)
-    char cwd[1024];
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-    getwd(cwd);  // Should use getcwd instead
+    mktemp(template_name);
     #pragma GCC diagnostic pop
+    std::cout << "[DEBUG] Template: " << template_name << "\n";
+    
+    // VULNERABLE: getwd is deprecated (buffer overflow risk) (Unix only)
+    char cwd_old[1024];
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    getwd(cwd_old);  // Should use getcwd instead
+    #pragma GCC diagnostic pop
+    std::cout << "[DEBUG] Current dir (getwd): " << cwd_old << "\n";
+    #endif
+    
+    // VULNERABLE: getcwd without error checking (cross-platform)
+    char cwd[1024];
+    getcwd(cwd, sizeof(cwd));  // Should check for NULL return
     std::cout << "[DEBUG] Current dir: " << cwd << "\n";
     
     /* END VULNERABILITY */
