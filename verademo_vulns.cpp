@@ -25,6 +25,11 @@
     #include <sys/stat.h>
 #endif
 
+// Kerberos library includes
+#include <krb5.h>
+#include <gssapi/gssapi.h>
+#include <gssapi/gssapi_krb5.h>
+
 // Simple MD5 stub
 namespace SimpleMD5 {
     std::string md5(const std::string& input) {
@@ -718,13 +723,202 @@ int DeadCodeVulns::code_after_return() {
     
     return 0;
     /* END VULNERABILITY */
-}
+    }
 
-// Helper functions
-std::string execute_sql_query(const std::string& query) {
+    // ============================================================================
+    // CWE-259/CWE-798/CWE-522: Kerberos Authentication Vulnerabilities
+    // ============================================================================
+
+    // CWE-259: Use of Hard-coded Password in Kerberos
+    void KerberosVulns::hardcoded_kerberos_password() {
+        std::cout << "[KerberosVulns::hardcoded_kerberos_password]\n";
+
+    /* VULNERABILITY: Hard-coded Kerberos credentials */
+    const char* HARDCODED_PRINCIPAL = "admin@EXAMPLE.COM";
+    const char* HARDCODED_PASSWORD = "MyKerberos123!";
+
+    std::cout << "[VULNERABLE] Using hard-coded Kerberos credentials:\n";
+    std::cout << "  Principal: " << HARDCODED_PRINCIPAL << "\n";
+    std::cout << "  Password: " << HARDCODED_PASSWORD << "\n";
+
+    vulnerable_kerberos_login(HARDCODED_PRINCIPAL, HARDCODED_PASSWORD);
+    }
+
+    // CWE-798: Use of Hard-coded Credentials
+    void KerberosVulns::insecure_kerberos_auth(const char* username) {
+    std::cout << "[KerberosVulns::insecure_kerberos_auth]\n";
+
+    /* VULNERABILITY: Hard-coded default password */
+    const char* DEFAULT_PASSWORD = "password123";
+
+    std::string principal = std::string(username) + "@REALM.LOCAL";
+
+    std::cout << "[VULNERABLE] Authenticating with default password\n";
+    vulnerable_kerberos_login(principal.c_str(), DEFAULT_PASSWORD);
+    }
+
+    // CWE-522: Insufficiently Protected Credentials
+    void KerberosVulns::weak_kerberos_config() {
+    std::cout << "[KerberosVulns::weak_kerberos_config]\n";
+
+    krb5_context context;
+    krb5_error_code retval;
+
+    /* VULNERABILITY: Initializing Kerberos without proper error checking */
+    retval = krb5_init_context(&context);
+
+    if (context) {
+        std::cout << "[DEBUG] Kerberos context initialized\n";
+
+        /* VULNERABILITY: Exposing Kerberos configuration details */
+        char* realm = nullptr;
+        retval = krb5_get_default_realm(context, &realm);
+        if (retval == 0 && realm) {
+            std::cout << "[VULNERABLE] Default realm: " << realm << "\n";
+            std::cout << "[VULNERABLE] KDC server: kdc." << realm << "\n";
+            std::cout << "[VULNERABLE] Admin server: admin." << realm << "\n";
+            krb5_free_default_realm(context, realm);
+        }
+
+        krb5_free_context(context);
+    }    }
+
+    // Demonstrates Kerberos library usage with vulnerabilities
+    void KerberosVulns::vulnerable_kerberos_login(const char* principal, const char* password) {
+    std::cout << "[KerberosVulns::vulnerable_kerberos_login]\n";
+
+    krb5_context context;
+    krb5_principal client_principal;
+    krb5_ccache ccache;
+    krb5_creds creds;
+    krb5_get_init_creds_opt *options = nullptr;
+    krb5_error_code retval;
+
+    /* VULNERABILITY: Initializing Kerberos context without validation */
+    retval = krb5_init_context(&context);
+    if (retval) {
+        /* VULNERABILITY: Exposing detailed error messages */
+        std::cerr << "[ERROR] Failed to initialize Kerberos context: " 
+                  << krb5_get_error_message(context, retval) << "\n";
+        std::cerr << "[DEBUG] Error code: " << retval << "\n";
+        return;
+    }
+
+    /* VULNERABILITY: Logging sensitive authentication details */
+    std::cout << "[DEBUG] Attempting Kerberos authentication\n";
+    std::cout << "[DEBUG] Principal: " << principal << "\n";
+    std::cout << "[DEBUG] Password length: " << strlen(password) << "\n";
+
+    /* Parse the principal name */
+    retval = krb5_parse_name(context, principal, &client_principal);
+    if (retval) {
+        std::cerr << "[ERROR] Failed to parse principal: " 
+                  << krb5_get_error_message(context, retval) << "\n";
+        krb5_free_context(context);
+        return;
+    }
+
+    /* Initialize credentials options */
+    retval = krb5_get_init_creds_opt_alloc(context, &options);
+    if (retval) {
+        std::cerr << "[ERROR] Failed to allocate cred options\n";
+        krb5_free_principal(context, client_principal);
+        krb5_free_context(context);
+        return;
+    }
+
+    /* VULNERABILITY: Using weak encryption or no encryption check */
+    std::cout << "[VULNERABLE] No encryption type validation performed\n";
+
+    /* Get initial credentials with password */
+    memset(&creds, 0, sizeof(creds));
+    retval = krb5_get_init_creds_password(context, &creds, client_principal,
+                                          (char*)password, nullptr, nullptr,
+                                          0, nullptr, options);
+
+    if (retval) {
+        /* VULNERABILITY: Detailed error with sensitive context */
+        std::cerr << "[ERROR] Failed to get initial credentials\n";
+        std::cerr << "[DEBUG] Principal: " << principal << "\n";
+        std::cerr << "[DEBUG] Error: " << krb5_get_error_message(context, retval) << "\n";
+    } else {
+        std::cout << "[SUCCESS] Obtained Kerberos credentials\n";
+
+        /* VULNERABILITY: Logging ticket information */
+        std::cout << "[DEBUG] Client principal: ";
+        char* client_name = nullptr;
+        if (krb5_unparse_name(context, creds.client, &client_name) == 0) {
+            std::cout << client_name << "\n";
+            krb5_free_unparsed_name(context, client_name);
+        }
+
+        std::cout << "[DEBUG] Server principal: ";
+        char* server_name = nullptr;
+        if (krb5_unparse_name(context, creds.server, &server_name) == 0) {
+            std::cout << server_name << "\n";
+            krb5_free_unparsed_name(context, server_name);
+        }
+
+        /* VULNERABILITY: Storing credentials insecurely */
+        retval = krb5_cc_default(context, &ccache);
+        if (retval == 0) {
+            retval = krb5_cc_initialize(context, ccache, client_principal);
+            if (retval == 0) {
+                retval = krb5_cc_store_cred(context, ccache, &creds);
+                std::cout << "[VULNERABLE] Credentials stored in default cache\n";
+            }
+            krb5_cc_close(context, ccache);
+        }
+
+        krb5_free_cred_contents(context, &creds);
+    }
+
+    /* Cleanup */
+    krb5_get_init_creds_opt_free(context, options);
+    krb5_free_principal(context, client_principal);
+    krb5_free_context(context);
+
+    /* VULNERABILITY: Using GSS-API without proper validation */
+    std::cout << "\n[VULNERABLE] Attempting GSS-API authentication\n";
+
+    gss_buffer_desc name_buffer;
+    gss_name_t gss_name;
+    OM_uint32 major_status, minor_status;
+
+    name_buffer.value = (void*)principal;
+    name_buffer.length = strlen(principal);
+
+    major_status = gss_import_name(&minor_status, &name_buffer,
+                                   GSS_C_NT_USER_NAME, &gss_name);
+
+    if (GSS_ERROR(major_status)) {
+        /* VULNERABILITY: Exposing GSS-API error details */
+        std::cerr << "[ERROR] GSS-API import name failed\n";
+        std::cerr << "[DEBUG] Major status: " << major_status << "\n";
+        std::cerr << "[DEBUG] Minor status: " << minor_status << "\n";
+    } else {
+        std::cout << "[DEBUG] GSS-API name imported successfully\n";
+
+        /* Display the name */
+        gss_buffer_desc display_name;
+        gss_OID name_type;
+        major_status = gss_display_name(&minor_status, gss_name,
+                                        &display_name, &name_type);
+        if (!GSS_ERROR(major_status)) {
+            std::cout << "[VULNERABLE] GSS-API display name: "
+                      << (char*)display_name.value << "\n";
+            gss_release_buffer(&minor_status, &display_name);
+        }
+
+        gss_release_name(&minor_status, &gss_name);
+    }
+    }
+
+    // Helper functions
+    std::string execute_sql_query(const std::string& query) {
     std::cout << "[SQL EXECUTION]\n";
     return (query.find("SELECT") != std::string::npos) ? "result_data" : "";
-}
+    }
 
 std::string execute_command(const std::string& command) {
     std::array<char, 128> buffer;

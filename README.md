@@ -23,6 +23,11 @@ make
 ### Building on macOS
 
 ```bash
+docker build . -t gcc-veracode
+docker run --rm -it -v .:/app --user root --workdir /app gcc-veracode:latest bash
+`
+
+```bash
 make docker-build
 ```
 

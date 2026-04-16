@@ -192,6 +192,22 @@ public:
     static int weak_random_number();
 };
 
+// CWE-259/CWE-798: Kerberos Authentication vulnerabilities
+class KerberosVulns {
+public:
+    // CWE-259: Use of Hard-coded Password in Kerberos
+    static void hardcoded_kerberos_password();
+    
+    // CWE-798: Use of Hard-coded Credentials
+    static void insecure_kerberos_auth(const char* username);
+    
+    // CWE-522: Insufficiently Protected Credentials
+    static void weak_kerberos_config();
+    
+    // Demonstrates Kerberos library usage with vulnerabilities
+    static void vulnerable_kerberos_login(const char* principal, const char* password);
+};
+
 // CWE-732/CWE-276: Permission/Privilege vulnerabilities
 class PermissionVulns {
 public:

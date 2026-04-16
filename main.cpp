@@ -454,6 +454,27 @@ int main() {
     std::cout << "\n=== END DANGEROUS FUNCTION VULNERABILITIES ===\n\n";
     
     // ========================================================================
+    // KERBEROS AUTHENTICATION VULNERABILITIES
+    // ========================================================================
+    
+    std::cout << "\n=== KERBEROS AUTHENTICATION VULNERABILITIES ===\n";
+    std::cout << "Testing Kerberos authentication vulnerabilities...\n\n";
+    
+    // CWE-259: Hard-coded Kerberos password
+    std::cout << "--- CWE-259: Hard-coded Kerberos Password ---\n";
+    KerberosVulns::hardcoded_kerberos_password();
+    
+    // CWE-798: Hard-coded credentials
+    std::cout << "\n--- CWE-798: Insecure Kerberos Auth ---\n";
+    KerberosVulns::insecure_kerberos_auth(username);
+    
+    // CWE-522: Weak Kerberos configuration
+    std::cout << "\n--- CWE-522: Weak Kerberos Config ---\n";
+    KerberosVulns::weak_kerberos_config();
+    
+    std::cout << "\n=== END KERBEROS AUTHENTICATION VULNERABILITIES ===\n\n";
+    
+    // ========================================================================
     // DEAD CODE VULNERABILITIES
     // ========================================================================
     
