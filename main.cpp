@@ -1,4 +1,6 @@
-// Windows compatibility
+// Windows ARM64 Security Demo - Native SSPI Authentication
+// This application demonstrates various security vulnerabilities
+// Uses Windows SSPI (Security Support Provider Interface) for ARM64
 #ifdef _WIN32
 #define _USE_MATH_DEFINES  // Enable M_PI, M_E constants
 #define _CRT_SECURE_NO_WARNINGS  // Allow ctime usage
@@ -195,8 +197,9 @@ void matrix_multiply(const std::vector<std::vector<double>>& a,
 }
 
 int main() {
-    std::cout << "ARM64 Sample Project - Security Scanner Test\n";
-    std::cout << "==============================================\n\n";
+    std::cout << "ARM64 Windows Security Demo - Native SSPI/Kerberos\n";
+    std::cout << "===================================================\n";
+    std::cout << "Windows ARM64 Native Build with SSPI Authentication\n\n";
     
     // CWE-117: Simulate user input that could contain log injection
     char username[256];
@@ -454,11 +457,11 @@ int main() {
     std::cout << "\n=== END DANGEROUS FUNCTION VULNERABILITIES ===\n\n";
     
     // ========================================================================
-    // KERBEROS AUTHENTICATION VULNERABILITIES
+    // WINDOWS SSPI/KERBEROS AUTHENTICATION VULNERABILITIES
     // ========================================================================
     
-    std::cout << "\n=== KERBEROS AUTHENTICATION VULNERABILITIES ===\n";
-    std::cout << "Testing Kerberos authentication vulnerabilities...\n\n";
+    std::cout << "\n=== WINDOWS SSPI/KERBEROS AUTHENTICATION VULNERABILITIES ===\n";
+    std::cout << "Testing Windows SSPI authentication vulnerabilities...\n\n";
     
     // CWE-259: Hard-coded Kerberos password
     std::cout << "--- CWE-259: Hard-coded Kerberos Password ---\n";
@@ -469,10 +472,10 @@ int main() {
     KerberosVulns::insecure_kerberos_auth(username);
     
     // CWE-522: Weak Kerberos configuration
-    std::cout << "\n--- CWE-522: Weak Kerberos Config ---\n";
+    std::cout << "\n--- CWE-522: Weak SSPI/Kerberos Config ---\n";
     KerberosVulns::weak_kerberos_config();
     
-    std::cout << "\n=== END KERBEROS AUTHENTICATION VULNERABILITIES ===\n\n";
+    std::cout << "\n=== END WINDOWS SSPI/KERBEROS AUTHENTICATION VULNERABILITIES ===\n\n";
     
     // ========================================================================
     // DEAD CODE VULNERABILITIES

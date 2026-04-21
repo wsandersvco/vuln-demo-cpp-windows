@@ -10,25 +10,31 @@
 #include <csignal>
 
 // Platform-specific includes
-#ifdef _WIN32
-    #include <io.h>
-    #include <direct.h>
-    #include <sys/stat.h>
-    #define popen _popen
-    #define pclose _pclose
-    #define access _access
-    #define F_OK 0
-    #define getcwd _getcwd
-    #define chmod _chmod
-#else
-    #include <unistd.h>
-    #include <sys/stat.h>
+#include <io.h>
+#include <direct.h>
+#include <sys/stat.h>
+
+// ARM64 intrinsics workaround for Windows SDK
+#ifdef _M_ARM64
+#include <intrin.h>
+#ifndef _CountOneBits64
+#define _CountOneBits64 __popcnt64
+#endif
 #endif
 
-// Kerberos library includes
-#include <krb5.h>
-#include <gssapi/gssapi.h>
-#include <gssapi/gssapi_krb5.h>
+// Windows SSPI Authentication (native ARM64 support)
+#define SECURITY_WIN32
+#include <windows.h>
+#include <security.h>
+#include <sspi.h>
+#include <ntsecapi.h>
+#pragma comment(lib, "Secur32.lib")
+#define popen _popen
+#define pclose _pclose
+#define access _access
+#define F_OK 0
+#define getcwd _getcwd
+#define chmod _chmod
 
 // Simple MD5 stub
 namespace SimpleMD5 {
@@ -761,156 +767,199 @@ int DeadCodeVulns::code_after_return() {
     void KerberosVulns::weak_kerberos_config() {
     std::cout << "[KerberosVulns::weak_kerberos_config]\n";
 
-    krb5_context context;
-    krb5_error_code retval;
-
-    /* VULNERABILITY: Initializing Kerberos without proper error checking */
-    retval = krb5_init_context(&context);
-
-    if (context) {
-        std::cout << "[DEBUG] Kerberos context initialized\n";
-
-        /* VULNERABILITY: Exposing Kerberos configuration details */
-        char* realm = nullptr;
-        retval = krb5_get_default_realm(context, &realm);
-        if (retval == 0 && realm) {
-            std::cout << "[VULNERABLE] Default realm: " << realm << "\n";
-            std::cout << "[VULNERABLE] KDC server: kdc." << realm << "\n";
-            std::cout << "[VULNERABLE] Admin server: admin." << realm << "\n";
-            krb5_free_default_realm(context, realm);
+    /* VULNERABILITY: Exposing Windows domain and authentication configuration */
+    ULONG authPackagesCount = 0;
+    PLSA_STRING authPackages = nullptr;
+    NTSTATUS status;
+    
+    status = LsaEnumerateLogonSessions(&authPackagesCount, nullptr);
+    
+    std::cout << "[DEBUG] Windows SSPI context initialized\n";
+    
+    /* VULNERABILITY: Exposing Kerberos/authentication configuration details */
+    PSecPkgInfoA packageInfo = nullptr;
+    SECURITY_STATUS secStatus = QuerySecurityPackageInfoA((SEC_CHAR*)"Kerberos", &packageInfo);
+    
+    if (secStatus == SEC_E_OK && packageInfo) {
+        std::cout << "[VULNERABLE] Package name: " << packageInfo->Name << "\n";
+        std::cout << "[VULNERABLE] Comment: " << packageInfo->Comment << "\n";
+        std::cout << "[VULNERABLE] Version: " << packageInfo->wVersion << "\n";
+        std::cout << "[VULNERABLE] Max token size: " << packageInfo->cbMaxToken << "\n";
+        
+        /* VULNERABILITY: Exposing domain information */
+        char computerName[256];
+        DWORD size = sizeof(computerName);
+        if (GetComputerNameA(computerName, &size)) {
+            std::cout << "[VULNERABLE] Computer name: " << computerName << "\n";
         }
-
-        krb5_free_context(context);
-    }    }
+        
+        char userName[256];
+        size = sizeof(userName);
+        if (GetUserNameA(userName, &size)) {
+            std::cout << "[VULNERABLE] Current user: " << userName << "\n";
+        }
+        
+        FreeContextBuffer(packageInfo);
+    }
+    }
 
     // Demonstrates Kerberos library usage with vulnerabilities
     void KerberosVulns::vulnerable_kerberos_login(const char* principal, const char* password) {
     std::cout << "[KerberosVulns::vulnerable_kerberos_login]\n";
 
-    krb5_context context;
-    krb5_principal client_principal;
-    krb5_ccache ccache;
-    krb5_creds creds;
-    krb5_get_init_creds_opt *options = nullptr;
-    krb5_error_code retval;
-
-    /* VULNERABILITY: Initializing Kerberos context without validation */
-    retval = krb5_init_context(&context);
-    if (retval) {
-        /* VULNERABILITY: Exposing detailed error messages */
-        std::cerr << "[ERROR] Failed to initialize Kerberos context: " 
-                  << krb5_get_error_message(context, retval) << "\n";
-        std::cerr << "[DEBUG] Error code: " << retval << "\n";
-        return;
-    }
-
     /* VULNERABILITY: Logging sensitive authentication details */
-    std::cout << "[DEBUG] Attempting Kerberos authentication\n";
+    std::cout << "[DEBUG] Attempting Windows SSPI/Kerberos authentication\n";
     std::cout << "[DEBUG] Principal: " << principal << "\n";
     std::cout << "[DEBUG] Password length: " << strlen(password) << "\n";
 
-    /* Parse the principal name */
-    retval = krb5_parse_name(context, principal, &client_principal);
-    if (retval) {
-        std::cerr << "[ERROR] Failed to parse principal: " 
-                  << krb5_get_error_message(context, retval) << "\n";
-        krb5_free_context(context);
-        return;
+    // Windows SSPI Kerberos authentication structures
+    CredHandle credHandle;
+    TimeStamp lifetime;
+    SEC_WINNT_AUTH_IDENTITY_A authIdentity;
+    SECURITY_STATUS secStatus;
+    
+    /* VULNERABILITY: Initializing auth identity without proper validation */
+    ZeroMemory(&authIdentity, sizeof(authIdentity));
+    
+    // Parse domain from principal (e.g., "user@DOMAIN.COM")
+    std::string principalStr(principal);
+    size_t atPos = principalStr.find('@');
+    std::string username, domain;
+    
+    if (atPos != std::string::npos) {
+        username = principalStr.substr(0, atPos);
+        domain = principalStr.substr(atPos + 1);
+    } else {
+        username = principalStr;
+        domain = "";
     }
+    
+    authIdentity.User = (unsigned char*)username.c_str();
+    authIdentity.UserLength = (unsigned long)username.length();
+    authIdentity.Domain = (unsigned char*)domain.c_str();
+    authIdentity.DomainLength = (unsigned long)domain.length();
+    authIdentity.Password = (unsigned char*)password;
+    authIdentity.PasswordLength = (unsigned long)strlen(password);
+    authIdentity.Flags = SEC_WINNT_AUTH_IDENTITY_ANSI;
 
-    /* Initialize credentials options */
-    retval = krb5_get_init_creds_opt_alloc(context, &options);
-    if (retval) {
-        std::cerr << "[ERROR] Failed to allocate cred options\n";
-        krb5_free_principal(context, client_principal);
-        krb5_free_context(context);
-        return;
-    }
-
-    /* VULNERABILITY: Using weak encryption or no encryption check */
+    /* VULNERABILITY: No encryption type validation */
     std::cout << "[VULNERABLE] No encryption type validation performed\n";
+    
+    /* Acquire credentials handle with password */
+    secStatus = AcquireCredentialsHandleA(
+        (SEC_CHAR*)username.c_str(),
+        (SEC_CHAR*)"Kerberos",
+        SECPKG_CRED_OUTBOUND,
+        nullptr,
+        &authIdentity,
+        nullptr,
+        nullptr,
+        &credHandle,
+        &lifetime
+    );
 
-    /* Get initial credentials with password */
-    memset(&creds, 0, sizeof(creds));
-    retval = krb5_get_init_creds_password(context, &creds, client_principal,
-                                          (char*)password, nullptr, nullptr,
-                                          0, nullptr, options);
-
-    if (retval) {
+    if (secStatus != SEC_E_OK) {
         /* VULNERABILITY: Detailed error with sensitive context */
-        std::cerr << "[ERROR] Failed to get initial credentials\n";
+        std::cerr << "[ERROR] Failed to acquire credentials handle\n";
         std::cerr << "[DEBUG] Principal: " << principal << "\n";
-        std::cerr << "[DEBUG] Error: " << krb5_get_error_message(context, retval) << "\n";
+        std::cerr << "[DEBUG] Error code: 0x" << std::hex << secStatus << std::dec << "\n";
+        
+        // Decode error message
+        char errMsg[512];
+        DWORD dwRet = FormatMessageA(
+            FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+            nullptr,
+            secStatus,
+            0,
+            errMsg,
+            sizeof(errMsg),
+            nullptr
+        );
+        if (dwRet > 0) {
+            std::cerr << "[DEBUG] Error: " << errMsg << "\n";
+        }
     } else {
-        std::cout << "[SUCCESS] Obtained Kerberos credentials\n";
+        std::cout << "[SUCCESS] Obtained Windows SSPI credentials\n";
 
-        /* VULNERABILITY: Logging ticket information */
-        std::cout << "[DEBUG] Client principal: ";
-        char* client_name = nullptr;
-        if (krb5_unparse_name(context, creds.client, &client_name) == 0) {
-            std::cout << client_name << "\n";
-            krb5_free_unparsed_name(context, client_name);
-        }
+        /* VULNERABILITY: Logging credential information */
+        SYSTEMTIME sysTime;
+        FILETIME ftLocal;
+        FileTimeToLocalFileTime((FILETIME*)&lifetime, &ftLocal);
+        FileTimeToSystemTime(&ftLocal, &sysTime);
+        
+        std::cout << "[DEBUG] Credential expiry: " 
+                  << sysTime.wYear << "-" << sysTime.wMonth << "-" << sysTime.wDay << " "
+                  << sysTime.wHour << ":" << sysTime.wMinute << ":" << sysTime.wSecond << "\n";
 
-        std::cout << "[DEBUG] Server principal: ";
-        char* server_name = nullptr;
-        if (krb5_unparse_name(context, creds.server, &server_name) == 0) {
-            std::cout << server_name << "\n";
-            krb5_free_unparsed_name(context, server_name);
-        }
-
-        /* VULNERABILITY: Storing credentials insecurely */
-        retval = krb5_cc_default(context, &ccache);
-        if (retval == 0) {
-            retval = krb5_cc_initialize(context, ccache, client_principal);
-            if (retval == 0) {
-                retval = krb5_cc_store_cred(context, ccache, &creds);
-                std::cout << "[VULNERABLE] Credentials stored in default cache\n";
+        /* VULNERABILITY: Exposing security context details */
+        CtxtHandle contextHandle;
+        SecBufferDesc outBufferDesc;
+        SecBuffer outSecBuffer;
+        ULONG contextAttr;
+        TimeStamp contextLifetime;
+        
+        outSecBuffer.cbBuffer = 0;
+        outSecBuffer.BufferType = SECBUFFER_TOKEN;
+        outSecBuffer.pvBuffer = nullptr;
+        
+        outBufferDesc.ulVersion = SECBUFFER_VERSION;
+        outBufferDesc.cBuffers = 1;
+        outBufferDesc.pBuffers = &outSecBuffer;
+        
+        secStatus = InitializeSecurityContextA(
+            &credHandle,
+            nullptr,
+            (SEC_CHAR*)("HOST/" + std::string(principal)).c_str(),
+            ISC_REQ_MUTUAL_AUTH | ISC_REQ_DELEGATE,
+            0,
+            SECURITY_NATIVE_DREP,
+            nullptr,
+            0,
+            &contextHandle,
+            &outBufferDesc,
+            &contextAttr,
+            &contextLifetime
+        );
+        
+        if (secStatus == SEC_I_CONTINUE_NEEDED || secStatus == SEC_E_OK) {
+            std::cout << "[VULNERABLE] Security context initialized\n";
+            std::cout << "[DEBUG] Token size: " << outSecBuffer.cbBuffer << " bytes\n";
+            
+            if (outSecBuffer.pvBuffer != nullptr) {
+                FreeContextBuffer(outSecBuffer.pvBuffer);
             }
-            krb5_cc_close(context, ccache);
+            DeleteSecurityContext(&contextHandle);
         }
 
-        krb5_free_cred_contents(context, &creds);
+        /* VULNERABILITY: Not securely clearing credentials from memory */
+        FreeCredentialsHandle(&credHandle);
     }
 
-    /* Cleanup */
-    krb5_get_init_creds_opt_free(context, options);
-    krb5_free_principal(context, client_principal);
-    krb5_free_context(context);
-
-    /* VULNERABILITY: Using GSS-API without proper validation */
-    std::cout << "\n[VULNERABLE] Attempting GSS-API authentication\n";
-
-    gss_buffer_desc name_buffer;
-    gss_name_t gss_name;
-    OM_uint32 major_status, minor_status;
-
-    name_buffer.value = (void*)principal;
-    name_buffer.length = strlen(principal);
-
-    major_status = gss_import_name(&minor_status, &name_buffer,
-                                   GSS_C_NT_USER_NAME, &gss_name);
-
-    if (GSS_ERROR(major_status)) {
-        /* VULNERABILITY: Exposing GSS-API error details */
-        std::cerr << "[ERROR] GSS-API import name failed\n";
-        std::cerr << "[DEBUG] Major status: " << major_status << "\n";
-        std::cerr << "[DEBUG] Minor status: " << minor_status << "\n";
-    } else {
-        std::cout << "[DEBUG] GSS-API name imported successfully\n";
-
-        /* Display the name */
-        gss_buffer_desc display_name;
-        gss_OID name_type;
-        major_status = gss_display_name(&minor_status, gss_name,
-                                        &display_name, &name_type);
-        if (!GSS_ERROR(major_status)) {
-            std::cout << "[VULNERABLE] GSS-API display name: "
-                      << (char*)display_name.value << "\n";
-            gss_release_buffer(&minor_status, &display_name);
+    /* VULNERABILITY: Using QuerySecurityPackageInfo to expose details */
+    std::cout << "\n[VULNERABLE] Querying Kerberos package information\n";
+    
+    PSecPkgInfoA pkgInfo = nullptr;
+    secStatus = QuerySecurityPackageInfoA((SEC_CHAR*)"Kerberos", &pkgInfo);
+    
+    if (secStatus == SEC_E_OK && pkgInfo) {
+        std::cout << "[DEBUG] Package: " << pkgInfo->Name << "\n";
+        std::cout << "[DEBUG] Max token: " << pkgInfo->cbMaxToken << " bytes\n";
+        std::cout << "[DEBUG] Capabilities: 0x" << std::hex << pkgInfo->fCapabilities << std::dec << "\n";
+        FreeContextBuffer(pkgInfo);
+    }
+    
+    /* VULNERABILITY: Enumerating security packages */
+    std::cout << "\n[VULNERABLE] Enumerating available security packages\n";
+    PSecPkgInfoA packages = nullptr;
+    ULONG packageCount = 0;
+    
+    secStatus = EnumerateSecurityPackagesA(&packageCount, &packages);
+    if (secStatus == SEC_E_OK && packages) {
+        std::cout << "[DEBUG] Available packages (" << packageCount << "):\n";
+        for (ULONG i = 0; i < packageCount && i < 5; i++) {
+            std::cout << "  - " << packages[i].Name << ": " << packages[i].Comment << "\n";
         }
-
-        gss_release_name(&minor_status, &gss_name);
+        FreeContextBuffer(packages);
     }
     }
 
